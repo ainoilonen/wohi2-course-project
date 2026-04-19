@@ -1,0 +1,147 @@
+const express = require("express");
+const router = express.Router();
+const prisma = require("../lib/prisma");
+
+//const questions = require("../data/questions");
+
+function formatQuestion(question) {
+  return {
+    ...question,
+    //date: question.date.toISOString().split("T")[0],
+    //keywords: question.keywords.map((k) => k.name),
+  };
+}
+
+// GET /questions
+// List all questions
+/*router.get("/", (req, res) => {
+  res.json(questions);
+});*/
+
+// GET /questions
+// List all questions if no filter (filter does not exist yet!)
+router.get("/", async (req, res) => {
+  const { keyword } = req.query;
+
+  const where = keyword ? { keywords: { some: { name: keyword } } } : {};
+
+  const questions = await prisma.question.findMany({
+    where,
+    //include: { keywords: true },
+    orderBy: { id: "asc" },
+  });
+
+  if (!questions) {
+    return res.status(404).json({
+      message: "Not found",
+    });
+  }
+
+  res.json(questions.map(formatQuestion));
+});
+
+// GET /questions/:questionId
+// Show a specific question
+router.get("/:questionId", async (req, res) => {
+  const questionId = Number(req.params.questionId);
+
+  const question = await prisma.question.findUnique({
+    where: { id: questionId },
+    //include: { keywords: true },
+  });
+
+  if (!question) {
+    return res.status(404).json({
+      message: "Question not found",
+    });
+  }
+
+  res.json(formatQuestion(question));
+});
+
+// POST /questions
+// Create a new question
+router.post("/", async (req, res) => {
+  const { question, answer } = req.body;
+
+  if (!question || !answer) {
+    return res.status(400).json({
+      message: "question and answer are required",
+    });
+  }
+  //const keywordsArray = Array.isArray(keywords) ? keywords : [];
+
+  const newQuestion = await prisma.question.create({
+    data: {
+      question,
+      answer,
+      /*keywords: {
+        connectOrCreate: keywordsArray.map((kw) => ({
+          where: { name: kw }, create: { name: kw },
+        })), },*/
+    },
+    //include: { keywords: true },
+  });
+
+  res.status(201).json(formatQuestion(newQuestion));
+});
+
+// PUT /questions/:questionId
+// Edit a question
+router.put("/:questionId", async (req, res) => {
+  const edidableQuestionId = Number(req.params.questionId);
+  const { question, answer } = req.body;
+
+  const edidableQuestion = await prisma.question.findUnique({
+    where: { id: edidableQuestionId },
+  });
+  if (!edidableQuestion) {
+    return res.status(404).json({ message: "Question not found" });
+  }
+
+  if (!question || !answer) {
+    return res.status(400).json({ msg: "question and answer are mandatory" });
+  }
+
+  //const keywordsArray = Array.isArray(keywords) ? keywords : [];
+  const updatedQuestion = await prisma.question.update({
+    where: { id: edidableQuestionId },
+    data: {
+      question,
+      answer,
+      /*keywords: {
+        set: [],
+        connectOrCreate: keywordsArray.map((kw) => ({
+          where: { name: kw },
+          create: { name: kw },
+        })),
+      },*/
+    },
+    //include: { keywords: true },
+  });
+  res.json(formatQuestion(updatedQuestion));
+});
+
+// DELETE /questions/:questionId
+// Delete a question
+router.delete("/:questionId", async (req, res) => {
+  const questionId = Number(req.params.questionId);
+
+  const question = await prisma.question.findUnique({
+    where: { id: questionId },
+    //include: { keywords: true },
+  });
+
+  if (!question) {
+    return res.status(404).json({ message: "Question not found" });
+  }
+
+  await prisma.question.delete({ where: { id: questionId } });
+
+  res.json({
+    message: "Question deleted successfully!",
+    question: formatQuestion(question),
+  });
+});
+
+module.exports = router;
