@@ -5,6 +5,8 @@ const prisma = require("./lib/prisma");
 
 const PORT = process.env.PORT || 3000;
 
+const questionsRouter = require("./routes/questions"); 
+
 // Middleware to parse JSON bodies (will be useful in later steps)
 app.use(express.json());
 
@@ -14,6 +16,7 @@ app.use("/api/questions", questionsRouter);
 app.use((req, res) => {
   res.json({ msg: "Not found" });
 });
+
 
 // Start the server
 app.listen(PORT, () => {
