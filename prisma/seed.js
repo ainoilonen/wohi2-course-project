@@ -1,49 +1,61 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
-const seedPosts = [
+const seedQuestions = [
   {
-    title: "Introduction to HTTP",
-    date: new Date("2026-03-20"),
-    content:
-      "HTTP is the foundation of communication on the web. It defines how clients and servers exchange data.",
+    question: "Q1",
+    answer: "A1",
+    userId: 1,
     keywords: ["http", "web"],
   },
   {
-    title: "Understanding REST APIs",
-    date: new Date("2026-03-22"),
-    content:
-      "REST is an architectural style that uses standard HTTP methods like GET, POST, PUT, and DELETE.",
+    question: "Q2",
+    answer: "A2",
+    userId: 1,
     keywords: ["http", "api"],
   },
   {
-    title: "Node.js Basics",
-    date: new Date("2026-03-25"),
-    content:
-      "Node.js allows you to run JavaScript on the server using a non-blocking, event-driven architecture.",
+    question: "Q3",
+    answer: "A3",
+    userId: 1,
     keywords: ["javascript", "backend"],
   },
   {
-    title: "Introduction to Databases",
-    date: new Date("2026-03-26"),
-    content:
-      "Databases store and organize data. Common types include relational databases like PostgreSQL and MySQL.",
+    question: "Q4",
+    answer: "A4",
+    userId: 1,
     keywords: ["database", "backend"],
   },
 ];
 
-async function main() {
-  await prisma.post.deleteMany();
-  await prisma.keyword.deleteMany();
 
-  for (const post of seedPosts) {
-    await prisma.post.create({
+const bcrypt = require("bcrypt");
+
+async function main() {
+  // Create a default user
+  const hashedPassword = await bcrypt.hash("1234", 10);
+  const user = await prisma.user.create({
+    data: {
+      email: "aino@wohii.fi",
+      password: hashedPassword,
+      name: "aino",
+    },
+  });
+
+  console.log("Created user:", user.email);
+  
+  await prisma.question.deleteMany();
+  await prisma.keyword.deleteMany();
+  //await prisma.user.deleteMany();
+
+  for (const question of seedQuestions) {
+    await prisma.question.create({
       data: {
-        title: post.title,
-        date: post.date,
-        content: post.content,
+        question: question.question,
+        answer: question.answer,
+        userId: user.id,
         keywords: {
-          connectOrCreate: post.keywords.map((kw) => ({
+          connectOrCreate: question.keywords.map((kw) => ({
             where: { name: kw },
             create: { name: kw },
           })),
