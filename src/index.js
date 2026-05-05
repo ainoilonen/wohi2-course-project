@@ -3,8 +3,11 @@ const app = express();
 const questionsRouter = require("./routes/questions");
 const prisma = require("./lib/prisma");
 const authRouter = require("./routes/auth");
+const path = require("path");
 
 const PORT = process.env.PORT || 3000;
+
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 //const questionsRouter = require("./routes/questions");
 
