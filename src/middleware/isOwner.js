@@ -8,12 +8,12 @@ async function isOwner(req, res, next) {
     include: { keywords: true },
   });
 
-  if (!post) {
-    throw new NotFoundError("Post not found");
+  if (!question) {
+    throw new NotFoundError("Question not found");
   }
 
-  if (post.userId !== req.user.userId) {
-    throw new ForbiddenError("You can only modify your own posts");
+  if (question.userId !== req.user.userId) {
+    throw new ForbiddenError("You can only modify your own questions");
   }
 
   // Attach the record to the request so the route handler can reuse it

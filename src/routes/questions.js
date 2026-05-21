@@ -59,7 +59,7 @@ router.use(authenticate);
 function formatQuestion(question) {
   return {
     ...question,
-    keywords: question.keywords.map((k) => k.name) || [],
+    keywords: question.keywords?.map((k) => k.name) ?? [],
     userName: question.user?.name || null,
     solved: question.guesses?.length > 0,
     user: undefined,
@@ -253,23 +253,30 @@ router.put(
 // DELETE /questions/:questionId
 // Delete a question
 router.delete("/:questionId", isOwner, async (req, res) => {
-  const questionId = Number(req.params.questionId);
+  try {
+    const questionId = Number(req.params.questionId);
 
-  const question = await prisma.question.findUnique({
-    where: { id: questionId },
-    include: { keywords: true, user: true },
-  });
+    const question = await prisma.question.findUnique({
+      where: { id: questionId },
+      include: { keywords: true, user: true },
+    });
 
-  if (!question) {
-    throw new NotFoundError("Question not found");
+    console.log("DEBUG question:", question);
+
+    if (!question) {
+      throw new NotFoundError("Question not found");
+    }
+
+    await prisma.question.delete({ where: { id: questionId } });
+
+    res.json({
+      message: "Question deleted successfully!",
+      question: formatQuestion(question),
+    });
+  } catch (err) {
+    console.error("DELETE ERROR:", err);
+    throw err;
   }
-
-  await prisma.question.delete({ where: { id: questionId } });
-
-  res.json({
-    message: "Question deleted successfully!",
-    question: formatQuestion(question),
-  });
 });
 
 module.exports = router;
