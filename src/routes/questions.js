@@ -253,30 +253,23 @@ router.put(
 // DELETE /questions/:questionId
 // Delete a question
 router.delete("/:questionId", isOwner, async (req, res) => {
-  try {
-    const questionId = Number(req.params.questionId);
+  const questionId = Number(req.params.questionId);
 
-    const question = await prisma.question.findUnique({
-      where: { id: questionId },
-      include: { keywords: true, user: true },
-    });
+  const question = await prisma.question.findUnique({
+    where: { id: questionId },
+    include: { keywords: true, user: true },
+  });
 
-    console.log("DEBUG question:", question);
-
-    if (!question) {
-      throw new NotFoundError("Question not found");
-    }
-
-    await prisma.question.delete({ where: { id: questionId } });
-
-    res.json({
-      message: "Question deleted successfully!",
-      question: formatQuestion(question),
-    });
-  } catch (err) {
-    console.error("DELETE ERROR:", err);
-    throw err;
+  if (!question) {
+    throw new NotFoundError("Question not found");
   }
+
+  await prisma.question.delete({ where: { id: questionId } });
+
+  res.json({
+    message: "Question deleted successfully!",
+    question: formatQuestion(question),
+  });
 });
 
 module.exports = router;
