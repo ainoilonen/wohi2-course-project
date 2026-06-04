@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE `users` ADD COLUMN `role` TINYINT NOT NULL DEFAULT 1;
