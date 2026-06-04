@@ -43,6 +43,7 @@ model User {
   role      Int        @default(1) @db.TinyInt
   questions Question[]
   guesses   Guess[]
+  @@map("users")
 }
 
 model Guess {
