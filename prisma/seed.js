@@ -39,7 +39,7 @@ async function main() {
   await prisma.question.deleteMany();
   await prisma.keyword.deleteMany();
   await prisma.user.deleteMany();
-        
+
   // Create a default user
   const hashedPassword = await bcrypt.hash("1234", 10);
   const user = await prisma.user.create({
@@ -52,7 +52,6 @@ async function main() {
   });
 
   console.log("Created user:", user.email);
- 
 
   for (const question of seedQuestions) {
     await prisma.question.create({
