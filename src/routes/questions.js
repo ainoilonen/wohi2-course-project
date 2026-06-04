@@ -12,6 +12,7 @@ const { z } = require("zod");
 const QuestionInput = z.object({
   question: z.string().min(1),
   answer: z.string().min(1),
+  difficulty: z.coerce.number().int().min(1).max(3),
   keywords: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
@@ -70,13 +71,31 @@ function formatQuestion(question) {
 // GET /questions
 // List all questions if no filter (filter does not exist yet!)
 router.get("/", async (req, res) => {
-  const { keyword } = req.query;
+  const { keyword, difficulty } = req.query;
 
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 3));
   const skip = (page - 1) * limit;
 
-  const where = keyword ? { keywords: { some: { name: keyword } } } : {};
+  const where = {};
+
+  if (keyword) {
+    where.keywords = {
+      some: {
+        name: keyword,
+      },
+    };
+  }
+
+  if (difficulty) {
+    const diff = Number(difficulty);
+
+    if (!(difficulty >= 1 && difficulty <= 3)) {
+      throw new ValidationError("Difficulty must be 1, 2 or 3");
+    }
+
+    where.difficulty = diff;
+  }
 
   const [filteredQuestions, total] = await Promise.all([
     prisma.question.findMany({
@@ -174,7 +193,9 @@ router.post("/:questionId/play", async (req, res) => {
 // POST /questions
 // Create a new question
 router.post("/", upload.single("image"), async (req, res) => {
-  const { question, answer, keywords } = QuestionInput.parse(req.body);
+  const { question, answer, difficulty, keywords } = QuestionInput.parse(
+    req.body,
+  );
 
   const keywordsArray = parseKeywords(keywords);
   const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
@@ -184,6 +205,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       question,
       answer,
       imageUrl,
+      difficulty,
       userId: req.user.userId,
       keywords: {
         connectOrCreate: keywordsArray.map((kw) => ({
@@ -206,7 +228,9 @@ router.put(
   isOwner,
   async (req, res) => {
     const edidableQuestionId = Number(req.params.questionId);
-    const { question, answer, keywords } = QuestionInput.parse(req.body);
+    const { question, answer, difficulty, keywords } = QuestionInput.parse(
+      req.body,
+    );
 
     const edidableQuestion = await prisma.question.findUnique({
       where: { id: edidableQuestionId },
@@ -215,15 +239,19 @@ router.put(
       throw new NotFoundError("Question not found");
     }
 
-    /*if (!question || !answer) {
-      throw new ValidationError("Question and answer are required");
-    }*/
-
     const keywordsArray = parseKeywords(keywords);
+
+    let imageUrl = edidableQuestion.imageUrl || null;
+
+    if (req.file) {
+      imageUrl = `/uploads/${req.file.filename}`;
+    }
 
     const data = {
       question,
       answer,
+      imageUrl,
+      difficulty,
       keywords: {
         set: [],
         connectOrCreate: keywordsArray.map((kw) => ({
@@ -232,10 +260,6 @@ router.put(
         })),
       },
     };
-
-    if (req.file) {
-      data.imageUrl = `/uploads/${req.file.filename}`;
-    }
 
     const updatedQuestion = await prisma.question.update({
       where: { id: edidableQuestionId },

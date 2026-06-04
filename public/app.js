@@ -13,6 +13,18 @@ function getCurrentUserId() {
   }
 }
 
+function getCurrentUserRole() {
+  const token = getToken();
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.role;
+  } catch {
+    return null;
+  }
+}
+
 function getToken() {
   return localStorage.getItem(CONFIG.STORAGE_KEY);
 }
@@ -117,6 +129,7 @@ async function showApp() {
 
 async function loadQuestions(keyword = "", page = 1) {
   const container = document.getElementById("questions-container");
+  const difficultyFilter = document.getElementById("difficulty-filter")?.value;
   container.innerHTML = '<p class="loading">Loading questions...</p>';
 
   try {
@@ -125,9 +138,11 @@ async function loadQuestions(keyword = "", page = 1) {
       limit: CONFIG.QUESTIONS_PER_PAGE,
     });
     if (keyword) params.set("keyword", keyword);
+    if (difficultyFilter) params.set("difficulty", difficultyFilter);
     const result = await apiFetch(`${CONFIG.ROUTES.QUESTIONS}?${params}`);
     const { data: questions, total, totalPages } = result;
     const currentUserId = getCurrentUserId();
+    const currentUserRole = getCurrentUserRole();
 
     const solvedCount = questions.filter(
       (q) => q[CONFIG.API_FIELDS.SOLVED],
@@ -145,11 +160,32 @@ async function loadQuestions(keyword = "", page = 1) {
         </div>
       </div>
       <div class="toolbar">
-        <button class="btn btn-primary" id="new-question-btn">+ New Question</button>
+        ${
+          currentUserRole === 2 || currentUserRole === 3
+            ? `<button class="btn btn-primary" id="new-question-btn">+ New Question</button>`
+            : ""
+        }
         <div class="search-bar">
           <input type="text" id="keyword-input" placeholder="Search by keyword..." value="${keyword}" />
+          <select id="difficulty-filter">
+            <option value="" ${difficultyFilter === "" ? "selected" : ""}>
+              All difficulties
+            </option>
+
+            <option value="1" ${difficultyFilter == 1 ? "selected" : ""}>
+              Easy
+            </option>
+
+            <option value="2" ${difficultyFilter == 2 ? "selected" : ""}>
+              Medium
+            </option>
+
+            <option value="3" ${difficultyFilter == 3 ? "selected" : ""}>
+              Hard
+            </option>
+          </select>
           <button class="btn btn-search" id="search-btn">Search</button>
-          ${keyword ? `<button class="btn btn-clear" id="clear-btn">Clear</button>` : ""}
+          ${keyword || difficultyFilter ? `<button class="btn btn-clear" id="clear-btn">Clear</button>` : ""}
         </div>
       </div>`;
 
@@ -158,11 +194,29 @@ async function loadQuestions(keyword = "", page = 1) {
         '<p class="empty-state">No questions found. Create one to get started!</p>';
     } else {
       html += questions
-        .map(
-          (q) => `
+        .map((q) => {
+          const difficultyMap = {
+            1: {
+              text: "Easy",
+              className: "badge-difficulty-easy",
+            },
+            2: {
+              text: "Medium",
+              className: "badge-difficulty-medium",
+            },
+            3: {
+              text: "Hard",
+              className: "badge-difficulty-hard",
+            },
+          };
+
+          const difficulty = difficultyMap[q.difficulty] || difficultyMap[1];
+
+          return `
         <article class="question-card ${q[CONFIG.API_FIELDS.SOLVED] ? "solved-card" : ""}">
           <h3>
             <a href="#" class="question-link" data-id="${q.id}">${q.question}</a>
+            <span class="${difficulty.className}">${difficulty.text}</span>
             ${q[CONFIG.API_FIELDS.SOLVED] ? `<span class="badge-solved">Solved</span>` : ""}
           </h3>
           ${
@@ -173,10 +227,16 @@ async function loadQuestions(keyword = "", page = 1) {
           <div class="question-actions">
             <span>
               <button class="btn btn-play" data-id="${q.id}">Play</button>
-              <a href="#" class="read-more" data-id="${q.id}">See answer</a>
+              ${
+                (q.userId === currentUserId && currentUserRole === 2) ||
+                currentUserRole === 3
+                  ? `<a href="#" class="read-more" data-id="${q.id}">See answer</a>`
+                  : ""
+              }
             </span>
             ${
-              q.userId === currentUserId
+              (q.userId === currentUserId && currentUserRole === 2) ||
+              currentUserRole === 3
                 ? `<span class="owner-actions">
                     <button class="btn btn-edit" data-id="${q.id}">Edit</button>
                     <button class="btn btn-delete" data-id="${q.id}">Delete</button>
@@ -184,8 +244,9 @@ async function loadQuestions(keyword = "", page = 1) {
                 : ""
             }
           </div>
-        </article>`,
-        )
+        </article>
+        `;
+        })
         .join("");
     }
 
@@ -200,9 +261,11 @@ async function loadQuestions(keyword = "", page = 1) {
 
     container.innerHTML = html;
 
-    document
-      .getElementById("new-question-btn")
-      .addEventListener("click", () => showQuestionForm());
+    const newQuestionBtn = document.getElementById("new-question-btn");
+
+    if (newQuestionBtn) {
+      newQuestionBtn.addEventListener("click", () => showQuestionForm());
+    }
 
     document.getElementById("search-btn").addEventListener("click", () => {
       loadQuestions(document.getElementById("keyword-input").value.trim(), 1);
@@ -215,8 +278,15 @@ async function loadQuestions(keyword = "", page = 1) {
       });
 
     const clearBtn = document.getElementById("clear-btn");
-    if (clearBtn) clearBtn.addEventListener("click", () => loadQuestions());
 
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        document.getElementById("keyword-input").value = "";
+        document.getElementById("difficulty-filter").value = "";
+
+        loadQuestions("", 1);
+      });
+    }
     const prevBtn = document.getElementById("prev-btn");
     if (prevBtn)
       prevBtn.addEventListener("click", () => loadQuestions(keyword, page - 1));
@@ -309,7 +379,7 @@ async function loadQuestionDetail(qId) {
 async function showQuestionForm(qId) {
   const container = document.getElementById("questions-container");
   const isEdit = !!qId;
-  let q = { question: "", answer: "", keywords: [] };
+  let q = { question: "", answer: "", difficulty: "", keywords: [] };
 
   if (isEdit) {
     try {
@@ -332,6 +402,14 @@ async function showQuestionForm(qId) {
         <div class="form-group">
           <label for="q-answer">Answer</label>
           <textarea id="q-answer" rows="4" required>${q.answer}</textarea>
+        </div>
+        <div class="form-group">
+        <label for="q-difficulty">Difficulty</label>
+          <select id="q-difficulty">
+            <option value="1" ${q.difficulty === 1 ? "selected" : ""}>Easy</option>
+            <option value="2" ${q.difficulty === 2 ? "selected" : ""}>Medium</option>
+            <option value="3" ${q.difficulty === 3 ? "selected" : ""}>Hard</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="q-keywords">Keywords (comma-separated)</label>
@@ -362,6 +440,7 @@ async function showQuestionForm(qId) {
       const body = new FormData();
       body.append("question", document.getElementById("q-question").value);
       body.append("answer", document.getElementById("q-answer").value);
+      body.append("difficulty", document.getElementById("q-difficulty").value);
       body.append("keywords", document.getElementById("q-keywords").value);
       const imageFile = document.getElementById("q-image").files[0];
       if (imageFile) body.append("image", imageFile);
